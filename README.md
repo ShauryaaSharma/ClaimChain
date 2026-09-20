@@ -2,6 +2,40 @@
 
 A working recovery workspace for small stores: evidence-backed cases, payment reconciliation, editable correspondence, PDF case packets, follow-up tasks, document recovery requirements, and stock transfers with inventory reservation and receipt confirmation.
 
+## Live deployment
+
+**https://d29p3muqc49obl.cloudfront.net**
+
+Running on AWS in `ap-southeast-2`. Sign in with the demonstration
+administrator account; the seeded workspace contains fictional records only.
+
+## AWS services
+
+Nine services, each doing work the application actually depends on.
+
+| Service | Role in ClaimChain | Verified |
+| --- | --- | --- |
+| Amazon EC2 | Single instance running the Django identity service and the Express workspace service in one container. One instance is deliberate: correctness rests on SQLite's single-writer transaction model, which needs real POSIX file locking. | Yes |
+| Amazon EBS | Encrypted persistent volume for the SQLite databases and original evidence files. | Yes |
+| AWS IAM | EC2 instance role scoped to only the S3, Textract and Bedrock actions the application performs. No credentials exist in the image, the environment, or this repository. | Yes |
+| Amazon S3 | Private evidence mirror, server-side encrypted, with each file's SHA-256 stored as object metadata. | Yes |
+| Amazon Textract | `DetectDocumentText` extraction from photographed PNG/JPEG evidence, so recorded facts trace back to the original document. | Yes |
+| Amazon Bedrock | Recovery-letter drafting through the Converse API. Evidence is supplied as untrusted data; model output is confined to a draft a human reviews and can never alter balances, stock or case status. | Yes |
+| Amazon CloudFront | HTTPS termination and the public origin. The cache policy honours origin headers, so content-hashed assets cache while workspace data never does. | Yes |
+| Amazon SES | Transactional email for account verification and password reset, through the SMTP endpoint. | Implemented; configured per deployment |
+| Amazon CloudWatch | Application logs and instance metrics. | Yes |
+
+Because `server/aws.ts` shares one `AWS_REGION` across its three clients, S3,
+Textract and Bedrock must live in the same region. Bedrock model availability
+therefore decides that region, and the evidence bucket follows it.
+
+Deliberately not used: **ECS Fargate** (SQLite over EFS means file locking over
+NFS), **Elastic Beanstalk** (replaces instances and would take the data volume
+with them), **App Runner** (no persistent storage), and **Amazon Cognito**
+(cannot express per-case row-level scoping, and authorization is checked inside
+the same transaction as the mutation it guards). See
+`docs/06-AWS-DEPLOYMENT-ARCHITECTURE.md` for the full reasoning.
+
 ## Run locally
 
 Requires Node.js 24 or newer and Python 3.11 or newer with Django installed.
@@ -45,6 +79,13 @@ Open http://127.0.0.1:3001. Do not run both commands on an occupied API port. `P
 Prepared letters are not sent automatically. Payment entries are owner-recorded, not bank-verified. Stock dispatch and receipt are owner-confirmed, not courier integrations. Exported case packets contain a manifest and text, not embedded copies of original binary evidence. Legal drafts are editable factual templates, not jurisdiction-validated legal advice or completed government filings.
 
 Local use needs no cloud credentials. AWS buttons appear only when their server-side settings are configured; live cloud operations still depend on account access. The application is one role-controlled workspace, not a tenant-isolated SaaS service. SQLite data is stored as a versioned atomic workspace snapshot to keep transactions consistent at this scale; scale-out requires a different repository.
+
+The deployed demonstration runs one EC2 instance with no load balancer, no
+autoscaling and no automated backup. That matches the single-writer design
+rather than working around it, and it means the instance is a single point of
+failure. Restoring from an EBS snapshot is a manual step. The Django identity
+service runs behind `manage.py runserver`, which is a development server and
+would be replaced with a WSGI server such as gunicorn before any real use.
 
 ## Verification
 

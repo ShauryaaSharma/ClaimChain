@@ -4,7 +4,56 @@
 
 This chapter explains how AWS services fit ClaimChain and how to deploy the current single-instance application for a controlled competition demonstration.
 
-**Current truth:** the repository contains executable AWS SDK v3 adapters and deployment packaging, but no AWS account, credentials, resources, or successful live deployment were supplied or verified here. “Proposed production” sections describe evolution, not shipped infrastructure.
+**Current truth:** the application is deployed and reachable at
+**https://d29p3muqc49obl.cloudfront.net**, running in `ap-southeast-2`. The
+services below were each exercised against the live instance rather than
+assumed working. “Proposed production” sections still describe evolution, not
+shipped infrastructure.
+
+### Deployed configuration
+
+| Component | Value |
+| --- | --- |
+| Public URL | `https://d29p3muqc49obl.cloudfront.net` |
+| Region | `ap-southeast-2` |
+| Compute | One EC2 `t3.micro`, Docker, both services from `scripts/start.mjs` |
+| Storage | Encrypted EBS volume mounted at `/app/data` |
+| Instance role | `claimchain-ec2`, inline policy `claimchain-access` |
+| Evidence bucket | `claim-chain-aws-first-com` |
+| Bedrock model | `amazon.nova-lite-v1:0` |
+| Origin exposure | Port 80 only; CloudFront terminates TLS |
+
+### Verification performed against the live instance
+
+- **IAM** — `aws sts get-caller-identity` returned
+  `assumed-role/claimchain-ec2`, confirming the instance profile resolves.
+- **Amazon S3** — `aws s3 cp` to the evidence bucket succeeded. `aws s3 ls` was
+  correctly denied: the policy grants `PutObject` and `GetObject` only, and the
+  application never lists buckets.
+- **Amazon Textract** — a `DetectDocumentText` call returned
+  `UnsupportedDocumentException` for a deliberately invalid payload, proving the
+  request authenticated and reached the service.
+- **Amazon Bedrock** — a `Converse` call returned a completion, and a second
+  call with a system block confirmed system prompts are honoured, which is the
+  exact shape `draftWithBedrock` sends.
+- **Application health** — `/api/health` and `/auth/health` both return `ok`
+  through CloudFront, confirming the Express and Django processes and the CDN
+  path.
+
+### Known gaps in the deployed demonstration
+
+- **Amazon SES** is implemented in `server/mailer.ts` and requires only SMTP
+  credentials in the environment. Confirm whether the running deployment has
+  them set; without them, `sendAuthCode` falls back to console logging.
+- **Django** runs under `manage.py runserver`, a development server. Replace it
+  with gunicorn before any non-demonstration use.
+- **No automated backup.** EBS snapshots are manual.
+- **Bedrock model choice was constrained by region.** No Anthropic model was
+  offered in `ap-southeast-2`, and the OpenAI models there are served through
+  AWS Marketplace, which this account's Service Control Policies prevented
+  subscribing to. Amazon Nova is native to Bedrock and worked on the first
+  call. Because the Converse API is model-agnostic, this was a one-variable
+  change with no code modification.
 
 ## AWS service map
 

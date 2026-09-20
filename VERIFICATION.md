@@ -79,20 +79,27 @@ PDF verification found a system-font substitution problem in the initial render.
 - No jurisdiction-specific legal claims are generated. Local letters use reviewed case facts and an editable template. Bedrock output, when enabled, remains a draft.
 - Original files remain separately downloadable. A PDF packet contains the evidence manifest, hashes and extracted text, not embedded copies of every binary attachment.
 - General retail inventory is implemented. Regulated medicine redistribution and construction safety remain outside the agreed release.
-- Production infrastructure provisioning was not performed. A Dockerfile, Compose configuration and AWS integration/deployment runbook are included.
+- Infrastructure has been provisioned and the application is deployed at `https://d29p3muqc49obl.cloudfront.net` in `ap-southeast-2`, using EC2, EBS, IAM, S3, Textract, Bedrock, CloudFront and CloudWatch. It is a single instance with no load balancer, no autoscaling and no automated backup, which matches the single-writer design rather than working around it. Django runs under the development server and would need gunicorn before real use. See `docs/06-AWS-DEPLOYMENT-ARCHITECTURE.md` for the verification performed against the live instance.
+
+## Verified against the live AWS deployment
+
+- Bedrock model access and regional availability. `amazon.nova-lite-v1:0` in `ap-southeast-2` returned a completion, and a system-prompt call confirmed the exact request shape `draftWithBedrock` uses. Generation quality on real case facts is still a judgement call, not a measured result.
+- S3 upload permissions and private-object configuration. An upload to `claim-chain-aws-first-com` succeeded under the instance role; `ListBuckets` was correctly denied, matching the scoped policy.
+- Textract reachability and authentication. A `DetectDocumentText` call reached the service and rejected a deliberately invalid payload.
+- Docker image execution and deployment to an AWS account, including the two-process Django/Express container.
+- HTTPS delivery through CloudFront to the EC2 origin.
 
 ## External verification still required
 
-- Live Bedrock model/inference-profile access, regional availability and generation quality.
-- Real S3 upload permissions, bucket policy and private-object configuration.
-- Live Textract extraction on actual store documents.
-- Docker image execution and deployment to an AWS account.
+- Live Textract extraction quality on actual photographed store documents, as opposed to service reachability.
+- Amazon SES delivery end to end, if SMTP credentials are set on the running deployment.
 - The supplied GitHub Actions workflow on a hosted Linux runner.
-- HTTPS reverse proxy, real production credentials, backup/restore drill and operational ownership.
+- Backup/restore drill and operational ownership. EBS snapshots are currently manual.
+- A WSGI server in place of the Django development server.
 - Broader browser/device and assistive-technology testing. The axe result covers the overview and tested rules, not a full WCAG conformance assessment.
 - Load testing, independent security assessment and non-Latin PDF language support.
 
-No automatic email/SMS delivery, bank verification, legal filing, government portal submission, courier dispatch or multi-tenant authorization is claimed. Stock actions are owner-confirmed workspace transactions. The app is functional locally and is not represented as a deployed production SaaS.
+No automatic email/SMS delivery, bank verification, legal filing, government portal submission, courier dispatch or multi-tenant authorization is claimed. Stock actions are owner-confirmed workspace transactions. The app is deployed and reachable on AWS as a single-instance demonstration; it is not represented as a production-hardened multi-tenant SaaS.
 
 ## Reproduce
 
